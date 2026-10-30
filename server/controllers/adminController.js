@@ -1,6 +1,7 @@
 
 const mongoose = require("mongoose");
 const Event = require("../models/Event");
+const { updateEventSafely } = require("../services/eventService");
 
 // Fields that an admin can provide when creating an event
 const CREATE_FIELDS = [
@@ -109,6 +110,48 @@ const createEvent = async (req, res) => {
   }
 };
 
+
+/**
+ * PUT /api/events/:id
+ * Update event details and capacity (admin only)
+ */
+const updateEvent = async (req, res) => {
+  try {
+    const event = await updateEventSafely(
+      req.params.id,
+      req.body
+    );
+
+    return res.status(200).json({
+      message: "Event updated successfully",
+      event
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        message: error.message
+      });
+    }
+
+    if (
+      error.name === "ValidationError" ||
+      error.name === "CastError"
+    ) {
+      return res.status(400).json({
+        message: error.message
+      });
+    }
+
+    console.error("Update event error:", error);
+
+    return res.status(500).json({
+      message: "Failed to update event"
+    });
+  }
+};
+
+
 module.exports = {
-  createEvent
+  createEvent,
+  updateEvent
 };
