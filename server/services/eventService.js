@@ -1,6 +1,7 @@
 
 const mongoose = require("mongoose");
 const Event = require("../models/Event");
+const Booking = require("../models/Booking");
 
 // Fields that admins are allowed to update
 const UPDATE_FIELDS = [
@@ -117,6 +118,73 @@ const updateEventSafely = async (eventId, updates) => {
   throw error;
 };
 
+
+/**
+ * Safely delete an event only if it has no
+ * confirmed bookings.
+ */
+const deleteEventSafely = async (eventId) => {
+  if (!mongoose.isObjectIdOrHexString(eventId)) {
+    const error = new Error("Invalid event ID");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return mongoose.connection.transaction(async (session) => {
+    // Read the event inside the transaction
+    const event = await Event.findById(eventId).session(session);
+
+    if (!event) {
+      const error = new Error("Event not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Active reserved seats mean deletion is not allowed
+    if (event.bookedSeats > 0) {
+      const error = new Error(
+        "Cannot delete an event with confirmed bookings"
+      );
+      error.statusCode = 409;
+      throw error;
+    }
+
+    // Check the Booking collection as an additional safeguard
+    const confirmedBooking = await Booking.exists({
+      event: event._id,
+      status: "confirmed"
+    }).session(session);
+
+    if (confirmedBooking) {
+      const error = new Error(
+        "Cannot delete an event with confirmed bookings"
+      );
+      error.statusCode = 409;
+      throw error;
+    }
+
+    // Delete within the same transaction
+    const result = await Event.deleteOne({
+      _id: event._id,
+      bookedSeats: 0
+    }).session(session);
+
+    if (result.deletedCount !== 1) {
+      const error = new Error(
+        "Event could not be deleted safely"
+      );
+      error.statusCode = 409;
+      throw error;
+    }
+
+    return {
+      message: "Event deleted successfully"
+    };
+  });
+};
+
+
 module.exports = {
-  updateEventSafely
+  updateEventSafely,
+  deleteEventSafely
 };
