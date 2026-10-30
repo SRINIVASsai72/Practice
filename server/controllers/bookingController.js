@@ -1,8 +1,8 @@
-
 const Booking = require("../models/Booking");
 
 const {
   createBooking: createBookingService,
+  cancelBooking: cancelBookingService,
   BookingError,
 } = require("../services/bookingService");
 
@@ -60,7 +60,34 @@ const getMyBookings = async (req, res) => {
   }
 };
 
+const cancelBooking = async (req, res) => {
+  try {
+    const booking = await cancelBookingService({
+      userId: req.user.id,
+      bookingId: req.params.id,
+    });
+
+    return res.status(200).json({
+      booking,
+      message: "Booking cancelled",
+    });
+  } catch (error) {
+    if (error instanceof BookingError) {
+      return res.status(error.statusCode).json({
+        message: error.message,
+      });
+    }
+
+    console.error("Cancel booking error:", error);
+
+    return res.status(500).json({
+      message: "Unable to cancel booking",
+    });
+  }
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
+  cancelBooking,
 };

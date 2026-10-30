@@ -316,7 +316,104 @@ const createBooking = async ({
   );
 };
 
+const cancelBooking = async ({ userId, bookingId }) => {
+  if (!mongoose.isValidObjectId(bookingId)) {
+    throw new BookingError("Invalid booking ID", 400);
+  }
+
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const session = await mongoose.startSession();
+    let commitStarted = false;
+
+    try {
+      session.startTransaction({
+        readPreference: "primary",
+        readConcern: { level: "snapshot" },
+        writeConcern: { w: "majority" },
+      });
+
+      const booking = await Booking.findOne({
+        _id: bookingId,
+        userId,
+      }).session(session);
+
+      if (!booking) {
+        throw new BookingError("Booking not found", 404);
+      }
+
+      if (booking.status === "cancelled") {
+        await session.abortTransaction();
+        return booking;
+      }
+
+      const updatedBooking = await Booking.findOneAndUpdate(
+        {
+          _id: bookingId,
+          userId,
+          status: "confirmed",
+        },
+        { $set: { status: "cancelled" } },
+        { session, new: true, runValidators: true }
+      );
+
+      if (!updatedBooking) {
+        throw new BookingError("Booking status changed", 409);
+      }
+
+      const result = await Event.updateOne(
+        {
+          _id: booking.eventId,
+          bookedSeats: { $gte: booking.quantity },
+        },
+        { $inc: { bookedSeats: -booking.quantity } },
+        { session }
+      );
+
+      if (result.modifiedCount !== 1) {
+        throw new BookingError(
+          "Unable to restore event seats",
+          409
+        );
+      }
+
+      commitStarted = true;
+      await commitWithRetry(session);
+
+      return updatedBooking;
+    } catch (error) {
+      if (!commitStarted && session.inTransaction()) {
+        await session.abortTransaction();
+      }
+
+      if (commitStarted) {
+        throw new BookingError(
+          "Cancellation result uncertain. Check booking status before retrying.",
+          503
+        );
+      }
+
+      if (
+        hasLabel(error, "TransientTransactionError") &&
+        attempt < 5
+      ) {
+        continue;
+      }
+
+      if (error instanceof BookingError) {
+        throw error;
+      }
+
+      throw error;
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  throw new BookingError("Cancellation failed", 503);
+};
+
 module.exports = {
   createBooking,
+  cancelBooking,
   BookingError,
 };

@@ -1,9 +1,9 @@
-
 const express = require("express");
 
 const {
   createBooking,
   getMyBookings,
+  cancelBooking,
 } = require("../controllers/bookingController");
 
 const {
@@ -15,12 +15,13 @@ const router = express.Router();
 // Protect all booking routes
 router.use(authenticate);
 
-// POST /api/bookings
-// Create a new booking
+// Create a booking
 router.post("/", createBooking);
 
-// GET /api/bookings/my
-// Get logged-in user's bookings
+// Get my bookings
 router.get("/my", getMyBookings);
+
+// Cancel a booking
+router.patch("/:id/cancel", cancelBooking);
 
 module.exports = router;
