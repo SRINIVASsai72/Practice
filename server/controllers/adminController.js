@@ -242,9 +242,35 @@ const getAdminStats = async (req, res) => {
 };
 
 
+/**
+ * GET /api/admin/bookings
+ * Return bookings with related user and event details.
+ */
+const getAdminBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find()
+      .populate("userId", "name email")
+      .populate("eventId", "title category venue city date price")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      bookings
+    });
+
+  } catch (error) {
+    console.error("Admin bookings error:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch admin bookings"
+    });
+  }
+};
+
+
 module.exports = {
   createEvent,
   updateEvent,
   deleteEvent,
-  getAdminStats
+  getAdminStats,
+  getAdminBookings
 };
