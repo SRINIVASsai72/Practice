@@ -1,7 +1,10 @@
 
 const mongoose = require("mongoose");
 const Event = require("../models/Event");
-const { updateEventSafely } = require("../services/eventService");
+const {
+  updateEventSafely,
+  deleteEventSafely
+} = require("../services/eventService");
 
 // Fields that an admin can provide when creating an event
 const CREATE_FIELDS = [
@@ -151,7 +154,46 @@ const updateEvent = async (req, res) => {
 };
 
 
+/**
+ * DELETE /api/events/:id
+ * Delete an event only when no confirmed bookings exist.
+ */
+const deleteEvent = async (req, res) => {
+  try {
+    const result = await deleteEventSafely(req.params.id);
+
+    return res.status(200).json({
+      message: result.message
+    });
+
+  } catch (error) {
+    // Handle known errors from eventService
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        message: error.message
+      });
+    }
+
+    if (
+      error.name === "ValidationError" ||
+      error.name === "CastError"
+    ) {
+      return res.status(400).json({
+        message: error.message
+      });
+    }
+
+    console.error("Delete event error:", error);
+
+    return res.status(500).json({
+      message: "Failed to delete event"
+    });
+  }
+};
+
+
 module.exports = {
   createEvent,
-  updateEvent
+  updateEvent,
+  deleteEvent
 };
