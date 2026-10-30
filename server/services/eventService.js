@@ -42,7 +42,7 @@ const updateEventSafely = async (eventId, updates) => {
     throw error;
   }
 
-  // Block unknown fields, including bookedSeats
+  // Reject unknown fields, including bookedSeats
   const invalidFields = keys.filter(
     (key) => !UPDATE_FIELDS.includes(key)
   );
@@ -55,7 +55,7 @@ const updateEventSafely = async (eventId, updates) => {
     throw error;
   }
 
-  // Explicitly validate important numeric fields
+  // Validate price
   if ("price" in updates) {
     if (
       typeof updates.price !== "number" ||
@@ -70,6 +70,7 @@ const updateEventSafely = async (eventId, updates) => {
     }
   }
 
+  // Validate total seats
   if ("totalSeats" in updates) {
     if (
       !Number.isSafeInteger(updates.totalSeats) ||
@@ -83,9 +84,10 @@ const updateEventSafely = async (eventId, updates) => {
     }
   }
 
-  // Condition evaluated atomically by MongoDB
+  // Atomic conditional update
   const filter = { _id: eventId };
 
+  // Capacity cannot be lower than already booked seats
   if ("totalSeats" in updates) {
     filter.bookedSeats = {
       $lte: updates.totalSeats
@@ -105,7 +107,7 @@ const updateEventSafely = async (eventId, updates) => {
     return event;
   }
 
-  // Find why the update did not match
+  // Determine why the update failed
   const exists = await Event.exists({ _id: eventId });
 
   const error = new Error(
@@ -118,10 +120,9 @@ const updateEventSafely = async (eventId, updates) => {
   throw error;
 };
 
-
 /**
- * Safely delete an event only if it has no
- * confirmed bookings.
+ * Delete an event only when there are
+ * no confirmed bookings.
  */
 const deleteEventSafely = async (eventId) => {
   if (!mongoose.isObjectIdOrHexString(eventId)) {
@@ -131,7 +132,8 @@ const deleteEventSafely = async (eventId) => {
   }
 
   return mongoose.connection.transaction(async (session) => {
-    // Read the event inside the transaction
+
+    // Find event inside transaction
     const event = await Event.findById(eventId).session(session);
 
     if (!event) {
@@ -140,7 +142,7 @@ const deleteEventSafely = async (eventId) => {
       throw error;
     }
 
-    // Active reserved seats mean deletion is not allowed
+    // Block deletion if tickets are booked
     if (event.bookedSeats > 0) {
       const error = new Error(
         "Cannot delete an event with confirmed bookings"
@@ -149,9 +151,9 @@ const deleteEventSafely = async (eventId) => {
       throw error;
     }
 
-    // Check the Booking collection as an additional safeguard
+    // Check confirmed bookings using Person 4's Booking schema
     const confirmedBooking = await Booking.exists({
-      event: event._id,
+      eventId: event._id,
       status: "confirmed"
     }).session(session);
 
@@ -163,7 +165,7 @@ const deleteEventSafely = async (eventId) => {
       throw error;
     }
 
-    // Delete within the same transaction
+    // Delete event within transaction
     const result = await Event.deleteOne({
       _id: event._id,
       bookedSeats: 0
@@ -182,7 +184,6 @@ const deleteEventSafely = async (eventId) => {
     };
   });
 };
-
 
 module.exports = {
   updateEventSafely,

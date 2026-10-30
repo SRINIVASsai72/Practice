@@ -1,6 +1,7 @@
 
 const mongoose = require("mongoose");
 const Event = require("../models/Event");
+const Booking = require("../models/Booking");
 const {
   updateEventSafely,
   deleteEventSafely
@@ -192,8 +193,58 @@ const deleteEvent = async (req, res) => {
 };
 
 
+/**
+ * GET /api/admin/stats
+ * Return dashboard statistics
+ */
+const getAdminStats = async (req, res) => {
+  try {
+    const [totalEvents, bookingStats] = await Promise.all([
+      Event.countDocuments(),
+
+      Booking.aggregate([
+        {
+          $match: {
+            status: "confirmed"
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalBookings: { $sum: 1 },
+            ticketsSold: { $sum: "$quantity" },
+            totalRevenue: { $sum: "$totalAmount" }
+          }
+        }
+      ])
+    ]);
+
+    const stats = bookingStats[0] || {
+      totalBookings: 0,
+      ticketsSold: 0,
+      totalRevenue: 0
+    };
+
+    return res.status(200).json({
+      totalEvents,
+      totalBookings: stats.totalBookings,
+      ticketsSold: stats.ticketsSold,
+      totalRevenue: stats.totalRevenue
+    });
+
+  } catch (error) {
+    console.error("Admin stats error:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch admin statistics"
+    });
+  }
+};
+
+
 module.exports = {
   createEvent,
   updateEvent,
-  deleteEvent
+  deleteEvent,
+  getAdminStats
 };
