@@ -1,24 +1,23 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
 
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+import Home from "./pages/Home";
+import Events from "./pages/Events";
+import EventDetails from "./pages/EventDetails";
 
-function App() {
+export default function App() {
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
-      <h1 className="text-5xl font-bold text-violet-400">
-        EventPulse
-      </h1>
-      <p className="mt-4 text-lg text-slate-300">
-        Discover. Book. Experience.
-      </p>
-      <button className="mt-8 rounded-xl bg-violet-600 px-6 py-3 font-semibold hover:bg-violet-700">
-        Explore Events
-      </button>
-    </div>
-  )
-}
+    <BrowserRouter>
+      <Navbar />
 
-export default App
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/events" element={<Events />} />
+        <Route path="/events/:id" element={<EventDetails />} />
+      </Routes>
+
+      <Footer />
+    </BrowserRouter>
+  );
+}
