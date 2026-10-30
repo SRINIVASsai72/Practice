@@ -9,10 +9,11 @@ const {
 
 const {
   createEvent,
-  updateEvent
+  updateEvent,
+  deleteEvent
 } = require("../controllers/adminController");
 
-// Person 4's authentication middleware
+// Authentication middleware owned by Person 4
 const {
   authenticate,
   requireAdmin
@@ -24,6 +25,9 @@ router.get("/:id", getEventById);
 
 // Admin-only routes
 router.post("/", authenticate, requireAdmin, createEvent);
+
 router.put("/:id", authenticate, requireAdmin, updateEvent);
+
+router.delete("/:id", authenticate, requireAdmin, deleteEvent);
 
 module.exports = router;
