@@ -7,8 +7,22 @@ const {
   getEventById
 } = require("../controllers/eventController");
 
-// Public routes — authentication not required
+const {
+  createEvent
+} = require("../controllers/adminController");
+
+// Person 4 owns this middleware.
+// It will become available after integration.
+const {
+  authenticate,
+  requireAdmin
+} = require("../middleware/authMiddleware");
+
+// Public routes
 router.get("/", getEvents);
 router.get("/:id", getEventById);
+
+// Admin-only route
+router.post("/", authenticate, requireAdmin, createEvent);
 
 module.exports = router;
